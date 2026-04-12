@@ -100,7 +100,7 @@
 <body>
 
 <div id="header">
-    <div class="brand">公廁快找</div>
+    <div class="brand"><span>🚽</span>公廁快找</div>
     <div class="status-box">
         <span id="mode-text">自動 GPS 定位</span>
         <button id="manual-btn" onclick="enterManualMode()">手動定位</button>
@@ -342,6 +342,22 @@
     function clearSelection() {
         selectedLineGroup.clearLayers();
         document.getElementById('info-panel').classList.remove('active');
+    }
+    function clearLines() { clearSelection(); }
+
+    function showDebug(msg) {
+        const console = document.getElementById('debug-console');
+        console.style.display = 'block';
+        console.innerText += "\n> " + msg;
+        setTimeout(() => console.style.display = 'none', 5000);
+    }
+
+    window.onload = initMap;
+</script>
+
+</body>
+</html>
+getElementById('info-panel').classList.remove('active');
     }
     function clearLines() { clearSelection(); }
 
