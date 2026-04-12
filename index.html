@@ -195,7 +195,8 @@
         isPlacing = true;
         document.getElementById('mode-text').innerText = "請點擊地圖設定位置";
         document.getElementById('reset-pos-btn').style.display = "none";
-        clearLines();
+        clearNearest();
+        clearSelection();
     }
 
     function relocateGps() {
@@ -339,6 +340,23 @@
         console.style.display = 'block';
         console.innerText += "\n> " + msg;
         setTimeout(() => console.style.display = 'none', 5000);
+    }
+
+    window.onload = initMap;
+</script>
+
+</body>
+</html>
+ody>
+</html>
+onload = initMap;
+</script>
+
+</body>
+</html>
+ody>
+</html>
+=> console.style.display = 'none', 5000);
     }
 
     window.onload = initMap;
