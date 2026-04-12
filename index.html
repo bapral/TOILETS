@@ -1,23 +1,33 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
+    <!-- 
+        全國公廁快找 (National Toilet Finder) 
+        版本：2026.04.12
+        功能：即時定位、手動標記、最近公廁搜尋、高對比 UI。
+    -->
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>公廁快找</title>
+    
+    <!-- PWA 與 iPhone 設定 -->
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1257/1257334.png">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1257/1257334.png">
     
+    <!-- Leaflet 地圖引擎 -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
+        /* 全域變數與配色 */
         :root {
-            --primary-color: #2ecc71;
-            --orange-color: #f39c12;
-            --blue-color: #3498db;
-            --red-color: #e74c3c;
-            --bg-color: #f8f9fa;
-            --header-yellow: #fbc531; /* 深黃底色 */
-            --header-text: #1d1d1f;   /* 對比黑字 */
+            --primary-color: #2ecc71;   /* 導航綠 (最近目標) */
+            --orange-color: #f39c12;    /* 選取橙 (特定目標) */
+            --blue-color: #3498db;      /* 手動定位藍 */
+            --red-color: #e74c3c;       /* GPS 標記紅 */
+            --bg-color: #f8f9fa;        /* 頁面背景 */
+            --header-yellow: #fbc531;   /* 標題列深黃 */
+            --header-text: #1d1d1f;     /* 標題列黑字 */
         }
 
         body, html {
@@ -25,9 +35,10 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background: var(--bg-color);
             overflow: hidden;
-            user-select: text;
+            user-select: text; /* 允許使用者複製資訊 */
         }
 
+        /* 標頭 (iOS 毛玻璃風格) */
         #header {
             position: absolute; top: 0; left: 0; right: 0; height: 64px;
             background: var(--header-yellow);
@@ -41,11 +52,11 @@
             font-size: 20px; font-weight: 800; color: var(--header-text); 
             display: flex; align-items: center; gap: 6px;
         }
-        #header .brand span { font-size: 22px; }
 
         #header .status-box { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
         #header #mode-text { font-size: 11px; color: #444; font-weight: 700; text-transform: uppercase; }
         
+        /* 手動定位按鈕 */
         #header #manual-btn {
             background: #333; color: white; border: none; 
             padding: 6px 14px; border-radius: 18px;
@@ -56,6 +67,7 @@
 
         #map { height: 100%; width: 100%; z-index: 1; }
 
+        /* 地圖控制鍵組 (右下角) */
         .map-controls {
             position: absolute; bottom: 30px; right: 20px;
             display: flex; flex-direction: column; gap: 15px;
@@ -69,9 +81,10 @@
         }
         .control-btn:active { transform: scale(0.9); }
         .control-btn svg { width: 28px; height: 28px; fill: white; }
-        #gps-btn { background: #444; }
-        #radar-btn { background: var(--primary-color); }
+        #gps-btn { background: #444; } /* 重新定位 */
+        #radar-btn { background: var(--primary-color); } /* 找最近 */
 
+        /* 底部資訊面板 (抽屜式) */
         #info-panel {
             position: absolute; bottom: 0; left: 0; right: 0;
             background: white; border-radius: 20px 20px 0 0;
@@ -79,9 +92,10 @@
             box-shadow: 0 -5px 20px rgba(0,0,0,0.1);
             transform: translateY(100%);
             transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            user-select: text;
         }
         #info-panel.active { transform: translateY(0); }
+        
+        /* 面板關閉按鈕 (X) */
         #close-btn {
             position: absolute; top: 15px; right: 20px;
             width: 32px; height: 32px; border-radius: 16px;
@@ -92,6 +106,8 @@
 
         #info-panel h2 { margin: 0 0 10px 0; font-size: 18px; padding-right: 40px; }
         #info-panel p { margin: 5px 0; color: #555; font-size: 14px; }
+        
+        /* 距離標籤樣式 */
         .distance-tag {
             display: inline-block; padding: 4px 12px;
             border-radius: 15px; font-weight: bold; margin-top: 10px;
@@ -99,22 +115,24 @@
         .dist-green { background: #eafaf1; color: var(--primary-color); border: 1px solid var(--primary-color); }
         .dist-orange { background: #fef5e7; color: var(--orange-color); border: 1px solid var(--orange-color); }
 
+        /* 偵錯區域樣式 */
         #debug-console {
             position: absolute; top: 75px; left: 10px; right: 10px;
             background: rgba(0,0,0,0.85); color: #0f0; font-family: monospace;
             padding: 10px; border-radius: 5px; z-index: 2000; display: none;
         }
 
-        /* 自定義廁所圖標樣式 */
+        /* 廁所圖標樣式 (深藍底、白框) */
         .toilet-icon-div {
             display: flex; align-items: center; justify-content: center;
-            background: white; border: 2px solid #3498db; border-radius: 50%;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            background: #0056b3; border: 2px solid white; border-radius: 8px;
+            box-shadow: 0 3px 8px rgba(0,0,0,0.5);
         }
     </style>
 </head>
 <body>
 
+<!-- 頂部標頭 -->
 <div id="header">
     <div class="brand"><span>🚽</span>公廁快找</div>
     <div class="status-box">
@@ -123,17 +141,22 @@
     </div>
 </div>
 
+<!-- 地圖容器 -->
 <div id="map"></div>
 
+<!-- 右下角控制項 -->
 <div class="map-controls">
+    <!-- GPS 按鈕：點擊切回自動模式並對準位置 -->
     <button id="gps-btn" class="control-btn" onclick="switchToAutoGps()" title="回到自動 GPS 定位">
         <svg viewBox="0 0 24 24"><path d="M12 8c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm8.94 3c-.46-4.17-3.77-7.48-7.94-7.94V1h-2v2.06C6.83 3.52 3.52 6.83 3.06 11H1v2h2.06c.46 4.17 3.77 7.48 7.94 7.94V23h2v-2.06c4.17-.46 7.48-3.77 7.94-7.94H23v-2h-2.06zM12 19c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/></svg>
     </button>
+    <!-- 雷達按鈕：搜尋最近公廁 -->
     <button id="radar-btn" class="control-btn" onclick="findNearest()" title="找最近公廁">
         <svg viewBox="0 0 24 24"><path d="M12,2L4.5,20.29L5.21,21L12,18L18.79,21L19.5,20.29L12,2Z"/></svg>
     </button>
 </div>
 
+<!-- 資訊面板 -->
 <div id="info-panel">
     <div id="close-btn" onclick="clearLines()">×</div>
     <div id="info-content">
@@ -144,28 +167,38 @@
     </div>
 </div>
 
+<!-- 隱藏式偵錯控制台 -->
 <div id="debug-console"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+    // --- 全域變數定義 ---
     let map, userMarker, manualMarker, toiletLayer;
-    let toilets = [];
-    let isManualMode = false;
-    let isPlacing = false;
-    let nearestLineGroup = L.featureGroup();
-    let selectedLineGroup = L.featureGroup();
-    let currentUserPos = [25.0330, 121.5654];
+    let toilets = [];           // 存放所有清理後的公廁資料
+    let isManualMode = false;   // 當前是否處於手動指定地點模式
+    let isPlacing = false;      // 手動模式下，是否正在等待點擊地圖選點
+    let nearestLineGroup = L.featureGroup();  // 存放最近目標的連線 (綠)
+    let selectedLineGroup = L.featureGroup(); // 存放點選目標的連線 (橙)
+    let currentUserPos = [25.0330, 121.5654]; // 預設位置 (台北)
 
-    // SVG 廁所圖示
-    const toiletSvg = `<svg viewBox="0 0 24 24" width="18" height="18" fill="#3498db"><path d="M9,22H15C16.1,22 17,21.1 17,20V18H7V20C7,21.1 7.9,22 9,22M17,14C17,10.13 13.87,7 10,7C6.13,7 3,10.13 3,14V16H17V14M21,2H7V5H21V2Z"/></svg>`;
+    // 公廁 SVG 圖示 (高對比設計)
+    const toiletSvg = `<svg viewBox="0 0 24 24" width="20" height="20" fill="white"><path d="M7,2H17V5H21V14C21,15.1 20.1,16 19,16H17V20C17,21.1 16.1,22 15,22H9C7.9,22 7,21.1 7,20V16H5C3.9,16 3,15.1 3,14V5H7V2M19,14V7H5V14H19Z"/></svg>`;
+
+    // --- 初始化流程 ---
 
     function initMap() {
+        // 建立 Leaflet 地圖物件
         map = L.map('map', { zoomControl: false }).setView(currentUserPos, 15);
+        
+        // 載入 OpenStreetMap 地圖切片
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        
+        // 建立圖層群組
         toiletLayer = L.layerGroup().addTo(map);
         nearestLineGroup.addTo(map);
         selectedLineGroup.addTo(map);
 
+        // 初始化 GPS 標記 (紅)
         const redIcon = L.icon({
             iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
             shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
@@ -173,15 +206,22 @@
         });
         userMarker = L.marker(currentUserPos, { icon: redIcon }).addTo(map);
 
+        // 地圖點擊事件：處理手動定位選點與面板關閉
         map.on('click', (e) => {
-            if (isManualMode && isPlacing) setManualPosition(e.latlng);
-            else clearLines();
+            if (isManualMode && isPlacing) {
+                setManualPosition(e.latlng);
+            } else {
+                clearLines(); // 點擊地圖空白處，關閉詳細面板
+            }
         });
 
-        startGpsTracking();
-        loadToilets();
+        startGpsTracking(); // 開始監聽 GPS 位置
+        loadToilets();      // 載入本地公廁 JSON 資料
     }
 
+    // --- 定位邏輯處理 ---
+
+    /** 進入手動定位模式：移除 GPS 跟隨，等待選點 */
     function enterManualMode() {
         isManualMode = true; isPlacing = true;
         document.getElementById('mode-text').innerText = "手動模式(請點選位置)";
@@ -190,6 +230,7 @@
         clearNearest(); clearSelection();
     }
 
+    /** 設定手動位置標記：鎖定位置，顯示藍色 📍 */
     function setManualPosition(latlng) {
         const blueIcon = L.icon({
             iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
@@ -205,6 +246,7 @@
         clearNearest(); clearSelection();
     }
 
+    /** 切換回自動 GPS 模式 (唯一回歸途徑) */
     function switchToAutoGps() {
         isManualMode = false; isPlacing = false;
         document.getElementById('mode-text').innerText = "自動 GPS 定位";
@@ -214,36 +256,41 @@
         clearNearest(); clearSelection();
     }
 
+    /** 監聽裝置位置更新 */
     function startGpsTracking() {
         if ("geolocation" in navigator) {
             navigator.geolocation.watchPosition((pos) => {
                 const latlng = [pos.coords.latitude, pos.coords.longitude];
                 userMarker.setLatLng(latlng);
-                if (!isManualMode) map.setView(latlng);
-            }, (err) => showDebug("GPS Error: " + err.message), { enableHighAccuracy: true });
+                if (!isManualMode) map.setView(latlng); // 自動模式下，視角跟隨
+            }, (err) => showDebug("GPS 權限或錯誤: " + err.message), { enableHighAccuracy: true });
         }
     }
 
+    /** 從靜態資料包載入 2.5 萬筆公廁資料 */
     async function loadToilets() {
         try {
             const response = await fetch('toilets.json');
             toilets = await response.json();
-            updateToiletsOnMap();
-            map.on('moveend', updateToiletsOnMap);
-            map.on('zoomend', updateToiletsOnMap); // 縮放結束也更新
-        } catch (err) { showDebug("Load Error: " + err.message); }
+            updateToiletsOnMap(); // 初始更新
+            map.on('moveend', updateToiletsOnMap); // 移動地圖時動態更新標記
+            map.on('zoomend', updateToiletsOnMap);  // 縮放地圖時動態調整密度
+        } catch (err) { showDebug("資料載入失敗: " + err.message); }
     }
 
+    // --- 地圖標記渲染 ---
+
+    /** 根據當前視窗與縮放層級，動態渲染公廁標記 */
     function updateToiletsOnMap() {
         toiletLayer.clearLayers();
         const bounds = map.getBounds();
         const zoom = map.getZoom();
         
-        // 大幅放寬顯示上限：層級越高 (越近)，幾乎顯示全部
+        // 智能顯示上限：放大 (Zoom 18+) 時顯示最多 1000 筆，確保巷弄細節完整
         let limit = 200;
-        if (zoom >= 18) limit = 1000;  // 巷弄層級顯示 1000 個
-        else if (zoom >= 16) limit = 600; // 街區層級顯示 600 個
-        else if (zoom >= 14) limit = 300; // 區域層級顯示 300 個
+        if (zoom >= 18) limit = 1000;
+        else if (zoom >= 16) limit = 600;
+        else if (zoom >= 14) limit = 300;
 
         const visibleToilets = toilets.filter(t => bounds.contains([t.latitude, t.longitude])).slice(0, limit);
 
@@ -251,22 +298,24 @@
             const customIcon = L.divIcon({
                 html: `<div class="toilet-icon-div">${toiletSvg}</div>`,
                 className: '',
-                iconSize: [30, 30], // 稍微增大圖標
-                iconAnchor: [15, 15]
+                iconSize: [30, 30], iconAnchor: [15, 15]
             });
 
             const marker = L.marker([t.latitude, t.longitude], { icon: customIcon }).addTo(toiletLayer);
             
-            // 點擊事件
+            // 點擊事件：顯示詳情並畫橙色連線
             marker.on('click', (ev) => {
-                L.DomEvent.stopPropagation(ev);
+                L.DomEvent.stopPropagation(ev); // 停止事件傳播至地圖，防止面板被自動關閉
                 showToiletDetail(t, false);
             });
         });
     }
 
+    // --- 計算與導航邏輯 ---
+
+    /** 計算兩點間的球體距離 (Haversine Formula) */
     function getDistance(p1, p2) {
-        const R = 6371e3;
+        const R = 6371e3; // 地球平均半徑 (公尺)
         const dLat = (p2.lat - p1.lat) * Math.PI / 180;
         const dLon = (p2.lng - p1.lng) * Math.PI / 180;
         const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
@@ -275,7 +324,9 @@
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
 
+    /** 顯示特定公廁的詳細資訊並畫出導航線 */
     function showToiletDetail(toilet, isNearest) {
+        // 依據目前模式決定起點 (紅點或藍點)
         const activeMarker = isManualMode ? manualMarker : userMarker;
         if (!activeMarker || !map.hasLayer(activeMarker)) {
             if (isManualMode) enterManualMode();
@@ -284,24 +335,30 @@
         const origin = activeMarker.getLatLng();
         const dest = L.latLng(toilet.latitude, toilet.longitude);
         const dist = Math.round(getDistance(origin, dest));
-        const walkTime = Math.ceil(dist / 80);
+        const walkTime = Math.ceil(dist / 80); // 假設步速 80m/min
 
+        // 清除對應的舊線條
         if (isNearest) clearNearest(); else clearSelection();
+        
         const color = isNearest ? 'var(--primary-color)' : 'var(--orange-color)';
         const targetGroup = isNearest ? nearestLineGroup : selectedLineGroup;
 
+        // 畫導航線 (實線 + 發光效果)
         L.polyline([origin, dest], { color: color, weight: 2, opacity: 1 }).addTo(targetGroup);
         L.polyline([origin, dest], { color: color, weight: 6, opacity: 0.3 }).addTo(targetGroup);
 
+        // 更新 UI 面板資訊
         document.getElementById('info-panel').classList.add('active');
         document.getElementById('info-name').innerText = toilet.name;
         document.getElementById('info-address').innerText = toilet.address;
         document.getElementById('info-facilities').innerText = "設施: " + toilet.facilities.join(", ") + (toilet.has_diaper ? " (有尿布檯)" : "");
+        
         const distTag = document.getElementById('distance-info');
         distTag.innerText = `直線距離: ${dist} 公尺 | 預估步行: ${walkTime} 分鐘`;
         distTag.className = "distance-tag " + (isNearest ? "dist-green" : "dist-orange");
     }
 
+    /** 搜尋距離定位點最近的公廁 */
     function findNearest() {
         const activeMarker = isManualMode ? manualMarker : userMarker;
         if (!activeMarker || !map.hasLayer(activeMarker)) {
@@ -311,29 +368,37 @@
         const origin = activeMarker.getLatLng();
         let minDest = Infinity;
         let nearestToilet = null;
+        
+        // 遍歷所有資料找尋最小值
         toilets.forEach(t => {
             const d = getDistance(origin, { lat: t.latitude, lng: t.longitude });
             if (d < minDest) { minDest = d; nearestToilet = t; }
         });
+        
         if (nearestToilet) {
             showToiletDetail(nearestToilet, true);
+            // 縮放地圖以同時看見起點與終點
             map.fitBounds(L.latLngBounds([origin, [nearestToilet.latitude, nearestToilet.longitude]]), { padding: [80, 80] });
         }
     }
+
+    // --- 圖層清理輔助 ---
 
     function clearNearest() { nearestLineGroup.clearLayers(); }
     function clearSelection() {
         selectedLineGroup.clearLayers();
         document.getElementById('info-panel').classList.remove('active');
     }
-    function clearLines() { clearSelection(); }
+    function clearLines() { clearSelection(); } // 點擊 X 或空白處時，保留綠線，僅清除橙選取
 
+    /** 在畫面頂部顯示偵錯訊息 */
     function showDebug(msg) {
         const console = document.getElementById('debug-console');
         console.style.display = 'block';
         console.innerText += "\n> " + msg;
-        setTimeout(() => console.style.display = 'none', 5000);
+        setTimeout(() => console.style.display = 'none', 10000);
     }
+
     window.onload = initMap;
 </script>
 
