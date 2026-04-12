@@ -288,8 +288,19 @@
         const color = isNearest ? 'var(--primary-color)' : 'var(--orange-color)';
         const targetGroup = isNearest ? nearestLineGroup : selectedLineGroup;
 
-        L.polyline([origin, dest], { color: color, weight: 3, dashArray: '8, 12', opacity: 1 }).addTo(targetGroup);
-        L.polyline([origin, dest], { color: color, weight: 12, opacity: 0.2 }).addTo(targetGroup);
+        // 核心細線 (實線)
+        L.polyline([origin, dest], {
+            color: color,
+            weight: 2,
+            opacity: 1
+        }).addTo(targetGroup);
+
+        // 發光光暈效果 (增強辨識度)
+        L.polyline([origin, dest], {
+            color: color,
+            weight: 6,
+            opacity: 0.3
+        }).addTo(targetGroup);
 
         document.getElementById('info-panel').classList.add('active');
         document.getElementById('info-name').innerText = toilet.name;
