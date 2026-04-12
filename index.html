@@ -256,7 +256,10 @@
             }).addTo(toiletLayer);
             
             const touchArea = L.circleMarker([t.latitude, t.longitude], { radius: 25, stroke: false, fillOpacity: 0 }).addTo(toiletLayer);
-            touchArea.on('click', () => showToiletDetail(t, false));
+            touchArea.on('click', (ev) => {
+                L.DomEvent.stopPropagation(ev); // 停止事件傳播，避免觸發地圖點擊關閉邏輯
+                showToiletDetail(t, false);
+            });
         });
     }
 
@@ -342,4 +345,6 @@
 </script>
 
 </body>
+</html>
+ody>
 </html>
