@@ -37,14 +37,13 @@
 
         #header .brand { font-size: 18px; font-weight: bold; color: var(--primary-color); }
         #header .status-box { display: flex; align-items: center; gap: 8px; }
-        #header #mode-text { font-size: 13px; color: #333; font-weight: 500; min-width: 90px; text-align: right; }
+        #header #mode-text { font-size: 13px; color: #333; font-weight: 500; text-align: right; }
         
-        #header button {
-            border: none; padding: 6px 12px; border-radius: 8px;
+        #header #manual-btn {
+            background: var(--blue-color); color: white; border: none; 
+            padding: 6px 12px; border-radius: 8px;
             font-size: 13px; font-weight: bold; cursor: pointer;
         }
-        #header #toggle-btn { background: var(--blue-color); color: white; }
-        #header #reset-pos-btn { background: #f39c12; color: white; display: none; }
 
         #map { height: 100%; width: 100%; z-index: 1; }
 
@@ -104,15 +103,14 @@
     <div class="brand">公廁快找</div>
     <div class="status-box">
         <span id="mode-text">自動 GPS 定位</span>
-        <button id="reset-pos-btn" onclick="startPlacing()">重選位置</button>
-        <button id="toggle-btn" onclick="toggleMode()">定位方式</button>
+        <button id="manual-btn" onclick="enterManualMode()">手動定位</button>
     </div>
 </div>
 
 <div id="map"></div>
 
 <div class="map-controls">
-    <button id="gps-btn" class="control-btn" onclick="relocateGps()" title="重新定位">
+    <button id="gps-btn" class="control-btn" onclick="switchToAutoGps()" title="回到自動 GPS 定位">
         <svg viewBox="0 0 24 24"><path d="M12,8A4,4 0 0,1 16,12A4,4 0 0,1 12,16A4,4 0 0,1 8,12A4,4 0 0,1 12,8M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4Z"/></svg>
     </button>
     <button id="radar-btn" class="control-btn" onclick="findNearest()" title="找最近公廁">
@@ -136,8 +134,8 @@
 <script>
     let map, userMarker, manualMarker, toiletLayer;
     let toilets = [];
-    let isManualMode = false;
-    let isPlacing = false; // 是否處於「等待點擊地圖設定位置」的狀態
+    let isManualMode = false; // 是否處於手動模式
+    let isPlacing = false;    // 是否正在等待點擊設定位置
     let nearestLineGroup = L.featureGroup();
     let selectedLineGroup = L.featureGroup();
     let currentUserPos = [25.0330, 121.5654];
@@ -157,56 +155,36 @@
         userMarker = L.marker(currentUserPos, { icon: redIcon }).addTo(map);
 
         map.on('click', (e) => {
-            if (isManualMode && isPlacing) setManualPosition(e.latlng);
+            if (isManualMode && isPlacing) {
+                setManualPosition(e.latlng);
+            } else {
+                clearLines();
+            }
         });
 
         startGpsTracking();
         loadToilets();
     }
 
-    function toggleMode() {
-        isManualMode = !isManualMode;
-        const modeText = document.getElementById('mode-text');
-        const resetBtn = document.getElementById('reset-pos-btn');
-        clearLines();
+    // --- 定位模式切換邏輯 ---
 
-        if (isManualMode) {
-            if (map.hasLayer(userMarker)) map.removeLayer(userMarker);
-            if (manualMarker) {
-                manualMarker.addTo(map);
-                map.setView(manualMarker.getLatLng());
-                modeText.innerText = "手動模式(已鎖定)";
-                resetBtn.style.display = "block";
-                isPlacing = false;
-            } else {
-                startPlacing();
-            }
-        } else {
-            modeText.innerText = "自動 GPS 定位";
-            resetBtn.style.display = "none";
-            isPlacing = false;
-            if (manualMarker && map.hasLayer(manualMarker)) map.removeLayer(manualMarker);
-            userMarker.addTo(map);
-            map.setView(userMarker.getLatLng());
-        }
-    }
-
-    function startPlacing() {
+    // 1. 點擊「手動定位」按鈕
+    function enterManualMode() {
+        isManualMode = true;
         isPlacing = true;
-        document.getElementById('mode-text').innerText = "請點擊地圖設定位置";
-        document.getElementById('reset-pos-btn').style.display = "none";
+        
+        document.getElementById('mode-text').innerText = "手動模式(請點選位置)";
+        
+        // 隱藏 GPS 紅點
+        if (map.hasLayer(userMarker)) map.removeLayer(userMarker);
+        
+        // 清除舊的手動標記與所有連線
+        if (manualMarker && map.hasLayer(manualMarker)) map.removeLayer(manualMarker);
         clearNearest();
         clearSelection();
     }
 
-    function relocateGps() {
-        // 如果目前是手動模式，則切換回自動 GPS 定位模式
-        if (isManualMode) {
-            toggleMode();
-        }
-        map.setView(userMarker.getLatLng(), 17);
-    }
-
+    // 2. 點擊地圖設定手動位置
     function setManualPosition(latlng) {
         const blueIcon = L.icon({
             iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
@@ -223,9 +201,28 @@
         
         isPlacing = false;
         document.getElementById('mode-text').innerText = "手動模式(已鎖定)";
-        document.getElementById('reset-pos-btn').style.display = "block";
-        clearLines();
+        clearNearest();
+        clearSelection();
     }
+
+    // 3. 點擊 GPS 按鈕切回自動模式 (唯一切回自動模式的途徑)
+    function switchToAutoGps() {
+        isManualMode = false;
+        isPlacing = false;
+        
+        document.getElementById('mode-text').innerText = "自動 GPS 定位";
+        
+        // 隱藏手動藍點，顯示 GPS 紅點
+        if (manualMarker && map.hasLayer(manualMarker)) map.removeLayer(manualMarker);
+        userMarker.addTo(map);
+        
+        // 重新對準位置並清除舊連線
+        map.setView(userMarker.getLatLng(), 17);
+        clearNearest();
+        clearSelection();
+    }
+
+    // --- 其他功能 ---
 
     function startGpsTracking() {
         if ("geolocation" in navigator) {
@@ -258,7 +255,7 @@
             
             const touchArea = L.circleMarker([t.latitude, t.longitude], { radius: 25, stroke: false, fillOpacity: 0 }).addTo(toiletLayer);
             touchArea.on('click', (ev) => {
-                L.DomEvent.stopPropagation(ev); // 停止事件傳播，避免觸發地圖點擊關閉邏輯
+                L.DomEvent.stopPropagation(ev);
                 showToiletDetail(t, false);
             });
         });
@@ -277,7 +274,7 @@
     function showToiletDetail(toilet, isNearest) {
         const activeMarker = isManualMode ? manualMarker : userMarker;
         if (!activeMarker || !map.hasLayer(activeMarker)) {
-            if (isManualMode) startPlacing();
+            if (isManualMode) enterManualMode();
             return;
         }
 
@@ -286,7 +283,8 @@
         const dist = Math.round(getDistance(origin, dest));
         const walkTime = Math.ceil(dist / 80);
 
-        clearLines();
+        if (isNearest) clearNearest(); else clearSelection();
+
         const color = isNearest ? 'var(--primary-color)' : 'var(--orange-color)';
         const targetGroup = isNearest ? nearestLineGroup : selectedLineGroup;
 
@@ -306,7 +304,7 @@
     function findNearest() {
         const activeMarker = isManualMode ? manualMarker : userMarker;
         if (!activeMarker || !map.hasLayer(activeMarker)) {
-            if (isManualMode) startPlacing();
+            if (isManualMode) enterManualMode();
             return;
         }
 
@@ -329,11 +327,12 @@
         }
     }
 
-    function clearLines() {
-        nearestLineGroup.clearLayers();
+    function clearNearest() { nearestLineGroup.clearLayers(); }
+    function clearSelection() {
         selectedLineGroup.clearLayers();
         document.getElementById('info-panel').classList.remove('active');
     }
+    function clearLines() { clearSelection(); }
 
     function showDebug(msg) {
         const console = document.getElementById('debug-console');
@@ -346,23 +345,4 @@
 </script>
 
 </body>
-</html>
-ody>
-</html>
-onload = initMap;
-</script>
-
-</body>
-</html>
-ody>
-</html>
-=> console.style.display = 'none', 5000);
-    }
-
-    window.onload = initMap;
-</script>
-
-</body>
-</html>
-ody>
 </html>
