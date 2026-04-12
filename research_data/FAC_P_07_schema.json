@@ -1,0 +1,21 @@
+{
+  "dataset_id": "FAC_P_07",
+  "title": "全國公廁建檔資料",
+  "source": "環境部環境資料開放平臺",
+  "fields": [
+    { "name": "county", "type": "string", "description": "縣市名稱" },
+    { "name": "areacode", "type": "string", "description": "鄉鎮市名稱" },
+    { "name": "village", "type": "string", "description": "村里名稱" },
+    { "name": "number", "type": "string", "description": "建檔編號" },
+    { "name": "name", "type": "string", "description": "建檔名稱" },
+    { "name": "address", "type": "string", "description": "地址" },
+    { "name": "administration", "type": "string", "description": "主管機關" },
+    { "name": "latitude", "type": "string", "description": "緯度" },
+    { "name": "longitude", "type": "string", "description": "經度" },
+    { "name": "grade", "type": "string", "description": "等級" },
+    { "name": "type2", "type": "string", "description": "公廁類別" },
+    { "name": "type", "type": "string", "description": "公廁類型" },
+    { "name": "exec", "type": "string", "description": "管理單位" },
+    { "name": "diaper", "type": "string", "description": "尿布檯組" }
+  ]
+}

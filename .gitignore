@@ -1,0 +1,12 @@
+# 排除金鑰與暫存檔
+.env.local
+total_count.txt
+research_data/all_toilets_batch1.json
+research_data/sample_toilets.json
+research_data/taipei_toilets_sample.json
+research_data/full_sample_toilets.json
+
+# Python 暫存
+__pycache__/
+*.py[cod]
+*$py.class

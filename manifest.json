@@ -1,0 +1,15 @@
+{
+  "name": "全國廁所快找",
+  "short_name": "廁所快找",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2ecc71",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/1257/1257334.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
