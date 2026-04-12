@@ -199,6 +199,10 @@
     }
 
     function relocateGps() {
+        // 如果目前是手動模式，則切換回自動 GPS 定位模式
+        if (isManualMode) {
+            toggleMode();
+        }
         map.setView(userMarker.getLatLng(), 17);
     }
 
