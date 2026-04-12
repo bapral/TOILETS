@@ -25,7 +25,7 @@
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background: var(--bg-color);
             overflow: hidden;
-            user-select: text; /* 確保內容可複製 */
+            user-select: text;
         }
 
         #header {
@@ -61,7 +61,6 @@
         }
 
         #radar-btn:active { transform: scale(0.9); }
-
         #radar-btn svg { width: 30px; height: 30px; fill: white; }
 
         /* 底部資訊面板 */
@@ -72,12 +71,21 @@
             box-shadow: 0 -5px 20px rgba(0,0,0,0.1);
             transform: translateY(100%);
             transition: transform 0.3s ease-out;
-            user-select: text; /* 確保內容可複製 */
+            user-select: text;
         }
 
         #info-panel.active { transform: translateY(0); }
 
-        #info-panel h2 { margin: 0 0 10px 0; font-size: 20px; }
+        /* 關閉按鈕 */
+        #close-btn {
+            position: absolute; top: 15px; right: 20px;
+            width: 32px; height: 32px; border-radius: 16px;
+            background: #f0f0f0; color: #333;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 24px; cursor: pointer; border: none;
+        }
+
+        #info-panel h2 { margin: 0 0 10px 0; font-size: 18px; padding-right: 40px; }
         #info-panel p { margin: 5px 0; color: #555; font-size: 14px; line-height: 1.5; }
         
         .distance-tag {
@@ -87,18 +95,13 @@
         .dist-green { background: #eafaf1; color: var(--primary-color); }
         .dist-orange { background: #fef5e7; color: var(--orange-color); }
 
-        /* 偵錯區域 */
         #debug-console {
             position: absolute; top: 70px; left: 10px; right: 10px;
-            background: rgba(0,0,0,0.7); color: #0f0;
-            font-family: monospace; font-size: 10px;
-            padding: 5px; border-radius: 5px; pointer-events: none;
-            display: none; z-index: 2000; user-select: text;
+            background: rgba(0,0,0,0.8); color: #0f0;
+            font-family: monospace; font-size: 11px;
+            padding: 10px; border-radius: 5px; z-index: 2000;
+            display: none; user-select: text;
         }
-
-        /* 自定義 Marker 樣式 */
-        .marker-red { filter: hue-rotate(140deg); }
-        .marker-blue { filter: hue-rotate(0deg); }
     </style>
 </head>
 <body>
@@ -115,6 +118,7 @@
 </div>
 
 <div id="info-panel">
+    <div id="close-btn" onclick="clearLines()">×</div>
     <div id="info-content">
         <h2 id="info-name">點擊公廁查看詳情</h2>
         <p id="info-address"></p>
@@ -125,7 +129,6 @@
 
 <div id="debug-console"></div>
 
-<!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
     let map, userMarker, manualMarker, toiletLayer;
@@ -133,143 +136,123 @@
     let isManualMode = false;
     let nearestLine = null;
     let selectedLine = null;
-    let currentUserPos = [25.0330, 121.5654]; // 預設台北
+    let currentUserPos = [25.0330, 121.5654];
 
-    // 1. 初始化地圖
     function initMap() {
         map = L.map('map', { zoomControl: false }).setView(currentUserPos, 15);
-        
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap'
-        }).addTo(map);
-
-        // 建立公廁圖層群組
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
         toiletLayer = L.layerGroup().addTo(map);
 
-        // 初始化 GPS 標記 (紅色)
         const redIcon = L.icon({
             iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
             shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-            iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+            iconSize: [25, 41], iconAnchor: [12, 41]
         });
         userMarker = L.marker(currentUserPos, { icon: redIcon }).addTo(map);
 
-        // 手動模式點擊事件
         map.on('click', (e) => {
-            if (isManualMode) {
-                setManualPosition(e.latlng);
-            }
+            if (isManualMode) setManualPosition(e.latlng);
         });
 
         startGpsTracking();
         loadToilets();
     }
 
-    // 2. 切換模式
     function toggleMode() {
         isManualMode = !isManualMode;
         const title = document.getElementById('title-text');
         const label = document.getElementById('mode-label');
-        
+        clearLines();
+
         if (isManualMode) {
             title.innerText = "手動指定地點";
             label.innerText = "點擊地圖標記";
             title.style.color = "var(--blue-color)";
-            if (manualMarker) map.setView(manualMarker.getLatLng());
+            if (map.hasLayer(userMarker)) map.removeLayer(userMarker);
+            if (manualMarker) {
+                manualMarker.addTo(map);
+                map.setView(manualMarker.getLatLng());
+            }
         } else {
             title.innerText = "自動 GPS 定位";
             label.innerText = "正在跟隨";
             title.style.color = "#333";
+            if (manualMarker && map.hasLayer(manualMarker)) map.removeLayer(manualMarker);
+            userMarker.addTo(map);
             map.setView(userMarker.getLatLng());
         }
-        clearLines();
     }
 
-    // 3. 設定手動標記
     function setManualPosition(latlng) {
         const blueIcon = L.icon({
             iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
             shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
-            iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34], shadowSize: [41, 41]
+            iconSize: [25, 41], iconAnchor: [12, 41]
         });
 
         if (manualMarker) {
             manualMarker.setLatLng(latlng);
+            if (!map.hasLayer(manualMarker)) manualMarker.addTo(map);
         } else {
             manualMarker = L.marker(latlng, { icon: blueIcon }).addTo(map);
         }
         clearLines();
     }
 
-    // 4. GPS 追蹤
     function startGpsTracking() {
         if ("geolocation" in navigator) {
             navigator.geolocation.watchPosition((pos) => {
                 const latlng = [pos.coords.latitude, pos.coords.longitude];
                 userMarker.setLatLng(latlng);
-                if (!isManualMode) {
-                    map.setView(latlng);
-                }
-            }, (err) => {
-                showDebug("GPS Error: " + err.message);
-            }, { enableHighAccuracy: true });
+                if (!isManualMode) map.setView(latlng);
+            }, (err) => showDebug("GPS Error: " + err.message), { enableHighAccuracy: true });
         }
     }
 
-    // 5. 載入公廁資料
     async function loadToilets() {
         try {
             const response = await fetch('toilets.json');
             toilets = await response.json();
             updateToiletsOnMap();
-            // 當地圖移動時更新顯示的公廁 (優化效能)
             map.on('moveend', updateToiletsOnMap);
-        } catch (err) {
-            showDebug("Load Error: " + err.message);
-        }
+        } catch (err) { showDebug("Load Error: " + err.message); }
     }
 
     function updateToiletsOnMap() {
         toiletLayer.clearLayers();
         const bounds = map.getBounds();
-        
-        // 只顯示畫面內的公廁，避免渲染過多標記
-        const visibleToilets = toilets.filter(t => 
-            bounds.contains([t.latitude, t.longitude])
-        ).slice(0, 100); // 每次最多顯示 100 個
+        const visibleToilets = toilets.filter(t => bounds.contains([t.latitude, t.longitude])).slice(0, 100);
 
         visibleToilets.forEach(t => {
             const marker = L.circleMarker([t.latitude, t.longitude], {
-                radius: 8, fillColor: "#fff", color: "#333", weight: 2, opacity: 1, fillOpacity: 0.8
+                radius: 8, fillColor: "#fff", color: "#333", weight: 2, fillOpacity: 0.8
             }).addTo(toiletLayer);
-
             marker.on('click', () => showToiletDetail(t, false));
         });
     }
 
-    // 6. 距離計算 (Haversine)
     function getDistance(p1, p2) {
-        const R = 6371e3; // 公尺
-        const φ1 = p1.lat * Math.PI/180;
-        const φ2 = p2.lat * Math.PI/180;
-        const Δφ = (p2.lat-p1.lat) * Math.PI/180;
-        const Δλ = (p2.lng-p1.lng) * Math.PI/180;
-
-        const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-                  Math.cos(φ1) * Math.cos(φ2) *
-                  Math.sin(Δλ/2) * Math.sin(Δλ/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        return R * c;
+        const R = 6371e3;
+        const dLat = (p2.lat - p1.lat) * Math.PI / 180;
+        const dLon = (p2.lng - p1.lng) * Math.PI / 180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                  Math.cos(p1.lat * Math.PI / 180) * Math.cos(p2.lat * Math.PI / 180) *
+                  Math.sin(dLon/2) * Math.sin(dLon/2);
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
 
-    // 7. 顯示詳情與劃線
     function showToiletDetail(toilet, isNearest) {
-        const origin = isManualMode ? manualMarker.getLatLng() : userMarker.getLatLng();
+        const activeMarker = isManualMode ? manualMarker : userMarker;
+        if (!activeMarker || !map.hasLayer(activeMarker)) {
+            if (isManualMode) alert("請先在地圖上點擊設定您的位置 (📍藍色標記)");
+            return;
+        }
+
+        const origin = activeMarker.getLatLng();
         const dest = L.latLng(toilet.latitude, toilet.longitude);
         const dist = Math.round(getDistance(origin, dest));
-        const walkTime = Math.ceil(dist / 80); // 假設每分鐘 80 公尺
+        const walkTime = Math.ceil(dist / 80);
 
-        // 劃線
         clearLines();
         const color = isNearest ? 'var(--primary-color)' : 'var(--orange-color)';
         const line = L.polyline([origin, dest], { color: color, weight: 4, dashArray: '10, 10' }).addTo(map);
@@ -277,7 +260,6 @@
         if (isNearest) nearestLine = line;
         else selectedLine = line;
 
-        // UI 顯示
         document.getElementById('info-panel').classList.add('active');
         document.getElementById('info-name').innerText = toilet.name;
         document.getElementById('info-address').innerText = toilet.address;
@@ -288,9 +270,14 @@
         distTag.className = "distance-tag " + (isNearest ? "dist-green" : "dist-orange");
     }
 
-    // 8. 搜尋最近
     function findNearest() {
-        const origin = isManualMode ? manualMarker.getLatLng() : userMarker.getLatLng();
+        const activeMarker = isManualMode ? manualMarker : userMarker;
+        if (!activeMarker || !map.hasLayer(activeMarker)) {
+            if (isManualMode) alert("手動模式下，請先點擊地圖設定您的位置 (📍藍色標記)");
+            return;
+        }
+
+        const origin = activeMarker.getLatLng();
         let minDest = Infinity;
         let nearestToilet = null;
 
@@ -311,6 +298,7 @@
     function clearLines() {
         if (nearestLine) map.removeLayer(nearestLine);
         if (selectedLine) map.removeLayer(selectedLine);
+        nearestLine = null; selectedLine = null;
         document.getElementById('info-panel').classList.remove('active');
     }
 
@@ -318,7 +306,7 @@
         const console = document.getElementById('debug-console');
         console.style.display = 'block';
         console.innerText += "\n> " + msg;
-        setTimeout(() => console.style.display = 'none', 5000);
+        setTimeout(() => console.style.display = 'none', 10000);
     }
 
     window.onload = initMap;
