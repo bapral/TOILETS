@@ -239,21 +239,20 @@
         const bounds = map.getBounds();
         const zoom = map.getZoom();
         
-        // 動態調整顯示上限：層級越高 (越近)，顯示越多
-        let limit = 100;
-        if (zoom >= 18) limit = 500;
-        else if (zoom >= 16) limit = 300;
-        else if (zoom >= 14) limit = 150;
+        // 大幅放寬顯示上限：層級越高 (越近)，幾乎顯示全部
+        let limit = 200;
+        if (zoom >= 18) limit = 1000;  // 巷弄層級顯示 1000 個
+        else if (zoom >= 16) limit = 600; // 街區層級顯示 600 個
+        else if (zoom >= 14) limit = 300; // 區域層級顯示 300 個
 
         const visibleToilets = toilets.filter(t => bounds.contains([t.latitude, t.longitude])).slice(0, limit);
 
         visibleToilets.forEach(t => {
-            // 使用自定義 SVG 廁所圖標
             const customIcon = L.divIcon({
                 html: `<div class="toilet-icon-div">${toiletSvg}</div>`,
                 className: '',
-                iconSize: [28, 28],
-                iconAnchor: [14, 14]
+                iconSize: [30, 30], // 稍微增大圖標
+                iconAnchor: [15, 15]
             });
 
             const marker = L.marker([t.latitude, t.longitude], { icon: customIcon }).addTo(toiletLayer);
