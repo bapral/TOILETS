@@ -43,25 +43,33 @@
             position: absolute; top: 0; left: 0; right: 0; height: 64px;
             background: var(--header-yellow);
             display: flex; align-items: center; justify-content: space-between;
-            padding: 0 20px;
+            padding: 0 15px;
             z-index: 1000;
             box-shadow: 0 2px 10px rgba(0,0,0,0.15);
         }
 
+        .header-left { display: flex; align-items: center; gap: 10px; flex: 1; }
+        .header-center { 
+            flex: 1.5; text-align: center; 
+            font-size: 12px; font-weight: 800; color: #333;
+            white-space: nowrap;
+        }
+        .header-right { flex: 1; display: flex; justify-content: flex-end; }
+
         #header .brand { 
-            font-size: 20px; font-weight: 800; color: var(--header-text); 
-            display: flex; align-items: center; gap: 6px;
+            font-size: 18px; font-weight: 800; color: var(--header-text); 
+            display: flex; align-items: center; gap: 4px;
         }
 
-        #header .status-box { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
-        #header #mode-text { font-size: 11px; color: #444; font-weight: 700; text-transform: uppercase; }
+        #header #mode-text { color: #d35400; text-transform: uppercase; }
         
         /* 手動定位按鈕 */
         #header #manual-btn {
             background: #333; color: white; border: none; 
-            padding: 6px 14px; border-radius: 18px;
-            font-size: 12px; font-weight: 800; cursor: pointer;
+            padding: 8px 12px; border-radius: 18px;
+            font-size: 11px; font-weight: 800; cursor: pointer;
             box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            white-space: nowrap;
         }
         #header #manual-btn:active { transform: scale(0.95); opacity: 0.9; }
 
@@ -166,13 +174,17 @@
 
 <!-- 頂部標頭 -->
 <div id="header">
-    <div class="brand"><span>🚽</span>公廁快找</div>
-    <div style="display: flex; align-items: center; gap: 12px;">
+    <div class="header-left">
+        <div class="brand"><span>🚽</span>公廁快找</div>
         <button id="help-btn" onclick="toggleManual()" title="操作說明">?</button>
-        <div class="status-box">
-            <span id="mode-text">自動 GPS 定位</span>
-            <button id="manual-btn" onclick="enterManualMode()">手動定位</button>
-        </div>
+    </div>
+    
+    <div class="header-center">
+        目前定位模式：<span id="mode-text">自動 GPS 定位</span>
+    </div>
+
+    <div class="header-right">
+        <button id="manual-btn" onclick="enterManualMode()">手動定位</button>
     </div>
 </div>
 
