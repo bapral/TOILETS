@@ -65,7 +65,39 @@
         }
         #header #manual-btn:active { transform: scale(0.95); opacity: 0.9; }
 
+        /* 說明按鈕 (問號) */
+        #help-btn {
+            background: rgba(0,0,0,0.1); border: 1.5px solid var(--header-text);
+            width: 28px; height: 28px; border-radius: 14px;
+            font-size: 16px; font-weight: 900; color: var(--header-text);
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
+            transition: background 0.2s;
+        }
+        #help-btn:active { background: rgba(0,0,0,0.2); }
+
         #map { height: 100%; width: 100%; z-index: 1; }
+
+        /* 操作說明彈窗 */
+        #manual-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); z-index: 3000;
+            display: none; align-items: center; justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+        #manual-modal.active { display: flex; }
+        .modal-content {
+            background: white; width: 85%; max-width: 400px; max-height: 80vh;
+            border-radius: 20px; padding: 25px; position: relative;
+            overflow-y: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        .modal-content h2 { margin-top: 0; color: var(--header-text); border-bottom: 2px solid var(--header-yellow); padding-bottom: 10px; }
+        .modal-content h3 { font-size: 16px; margin: 15px 0 5px 0; color: #333; }
+        .modal-content p, .modal-content li { font-size: 14px; color: #555; line-height: 1.6; margin: 5px 0; }
+        .modal-content ul { padding-left: 20px; }
+        .close-modal {
+            position: absolute; top: 15px; right: 20px; font-size: 28px;
+            color: #999; cursor: pointer; font-weight: bold;
+        }
 
         /* 地圖控制鍵組 (右下角) */
         .map-controls {
@@ -135,9 +167,12 @@
 <!-- 頂部標頭 -->
 <div id="header">
     <div class="brand"><span>🚽</span>公廁快找</div>
-    <div class="status-box">
-        <span id="mode-text">自動 GPS 定位</span>
-        <button id="manual-btn" onclick="enterManualMode()">手動定位</button>
+    <div style="display: flex; align-items: center; gap: 12px;">
+        <button id="help-btn" onclick="toggleManual()" title="操作說明">?</button>
+        <div class="status-box">
+            <span id="mode-text">自動 GPS 定位</span>
+            <button id="manual-btn" onclick="enterManualMode()">手動定位</button>
+        </div>
     </div>
 </div>
 
@@ -170,6 +205,28 @@
 <!-- 隱藏式偵錯控制台 -->
 <div id="debug-console"></div>
 
+<!-- 操作說明彈窗 -->
+<div id="manual-modal" onclick="if(event.target==this)toggleManual()">
+    <div class="modal-content">
+        <span class="close-modal" onclick="toggleManual()">&times;</span>
+        <h2>📖 操作說明</h2>
+        <div class="manual-body">
+            <h3>1. 定位模式</h3>
+            <ul>
+                <li><strong>自動 GPS (🔴紅點)</strong>: 隨您的位置移動。點擊右下角 [🎯] 可隨時回歸。</li>
+                <li><strong>手動選點 (📍藍點)</strong>: 點擊上方「手動定位」後點選地圖任意處，適合搜尋遠方。</li>
+            </ul>
+            <h3>2. 搜尋與導航</h3>
+            <ul>
+                <li><strong>找最近 (🚀)</strong>: 點擊右下角綠色雷達按鈕，自動連線至最近公廁。</li>
+                <li><strong>選站點 (橙線)</strong>: 直接點擊地圖上的公廁圖標，查看詳細資訊與路程。</li>
+            </ul>
+            <h3>3. 面板資訊</h3>
+            <p>點擊站點後底部彈出面板，顯示地址、設施（男/女/無障礙/尿布檯）及步行估計時間。長按地址可複製。</p>
+        </div>
+    </div>
+</div>
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
     // --- 全域變數定義 ---
@@ -183,6 +240,14 @@
 
     // 公廁 SVG 圖示 (高對比設計)
     const toiletSvg = `<svg viewBox="0 0 24 24" width="20" height="20" fill="white"><path d="M7,2H17V5H21V14C21,15.1 20.1,16 19,16H17V20C17,21.1 16.1,22 15,22H9C7.9,22 7,21.1 7,20V16H5C3.9,16 3,15.1 3,14V5H7V2M19,14V7H5V14H19Z"/></svg>`;
+
+    // --- 介面交互 ---
+
+    /** 切換操作說明彈窗 */
+    function toggleManual() {
+        const modal = document.getElementById('manual-modal');
+        modal.classList.toggle('active');
+    }
 
     // --- 初始化流程 ---
 
