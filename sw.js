@@ -1,6 +1,6 @@
 // 資料與程式合一的 PWA 快取管理腳本
 // 當 build_app.py 執行時，會自動更新此處的 CACHE_NAME 版本號
-const CACHE_NAME = 'toilet-app-v20260412-132321'; 
+const CACHE_NAME = 'toilet-app-v20260419-013108'; 
 
 const urlsToCache = [
   './',
